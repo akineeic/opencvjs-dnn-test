@@ -52,28 +52,25 @@
 
     <P style="visibility: hidden" id="result"></P>
 
-    <script src="./wasm/opencv.js"  type="text/javascript"></script>
 
     <script type="text/javascript">
     let runButton = document.getElementById("runButton")
+    let backendBox = document.getElementById("backend")
+    //runButton.addEventListener("click", chooseBackend)
     runButton.addEventListener("click", run)
-
+    backendBox.addEventListener("change", chooseBackend)
+    chooseBackend();
 
     function run(){
-        console.log("opencv.js loaded");
-        opencvready();
         let imgelement = document.getElementById("imgsrc");
         let inputelement = document.getElementById("fileinput");
         inputelement.addEventListener("change", (e) =>{
             imgelement.src = URL.createObjectURL(e.target.files[0]);
         }, false)
         let iterations = Number(document.querySelector('#iterations').value);
-        let backend = document.getElementById("backend").value;
-        let model = document.getElementById("modelName").value;
 
         let net;
         let keywords;
-
 
         let mat = cv.imread("imgsrc");
         let matC3 = new cv.Mat(mat.matSize[0],mat.matSize[1],cv.CV_8UC3);
@@ -142,6 +139,40 @@
             });
     };
 
+    function chooseBackend(){
+        console.log('choose backend')
+        let backend = document.getElementById("backend").value;
+
+        var head = document.getElementsByTagName('head')[0];
+        if(document.getElementById("backendScript")!=null){
+            console.log('delete backend')
+            //window.location.reload();
+            //head.removeChild(document.getElementById("backendScript"));
+            delete window.cv;
+        };
+
+        var js = document.createElement("script");
+        js.type = "text/javascript";
+        js.id = 'backendScript';
+        switch (backend){
+            case 'WASM':
+                js.src = "./backend/WASM/opencv.js";
+                break;
+            case 'Threads':
+                js.src = "./backend/Threads/opencv.js";
+                break;
+            case 'SIMD':
+                js.src = "./backend/SIMD/opencv.js";
+                break;
+            case 'Threads+SIMD':
+                js.src = "./backend/Threads+SIMD/opencv.js";
+                break;
+            default: throw new Error('Undefined backend')
+        }
+        head.appendChild(js);
+        console.log("opencv.js loaded");
+        opencvready();
+    };
 
     function createFileFromUrl(path, url, callback){
         let request = new XMLHttpRequest();
