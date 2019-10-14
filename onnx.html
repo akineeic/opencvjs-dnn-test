@@ -60,12 +60,14 @@
     backendBox.addEventListener("change", getBackend)
     getBackend();
 
+    let imgelement = document.getElementById("imgsrc");
+    let inputelement = document.getElementById("fileinput");
+    inputelement.addEventListener("change", (e) =>{
+        imgelement.src = URL.createObjectURL(e.target.files[0]);
+    }, false)
+
     function run(){
-        let imgelement = document.getElementById("imgsrc");
-        let inputelement = document.getElementById("fileinput");
-        inputelement.addEventListener("change", (e) =>{
-            imgelement.src = URL.createObjectURL(e.target.files[0]);
-        }, false)
+        
         let iterations = Number(document.querySelector('#iterations').value);
 
         let net;
