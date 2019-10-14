@@ -1,2 +1,2 @@
 ## Download Model
-Before run this demo, you need to download the onnx model into this folder manually.
+Before run this demo, you need to download the onnx model into this folder manually and modify the model name with the name showed in the web page. The supported models are squeezenet, mobilenetv2, resnet50v1 and resnet50v2 with ONNX format up to now.

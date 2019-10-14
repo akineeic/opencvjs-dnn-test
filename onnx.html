@@ -21,10 +21,10 @@
     <div>
         <p>Model</p>
         <select id='modelName'>
-            <option>mobilnetv2-1.0</option>
+            <option>mobilenetv2</option>
             <option>resnet50v1</option>
             <option>resnet50v2</option>
-            <option>squeezenet1.1</option>
+            <option>squeezenet</option>
         </select>
     </div>
 
@@ -56,10 +56,9 @@
     <script type="text/javascript">
     let runButton = document.getElementById("runButton")
     let backendBox = document.getElementById("backend")
-    //runButton.addEventListener("click", chooseBackend)
     runButton.addEventListener("click", run)
-    backendBox.addEventListener("change", chooseBackend)
-    chooseBackend();
+    backendBox.addEventListener("change", getBackend)
+    getBackend();
 
     function run(){
         let imgelement = document.getElementById("imgsrc");
@@ -97,7 +96,8 @@
         // cv.cvtColor(newMat, newMat, cv.COLOR_BGR2RGB)
 
         console.log('load model...')
-        let onnxmodel = 'squeezenet1.1.onnx';
+        let onnxmodel = document.getElementById("modelName").value + '.onnx';
+        console.log(onnxmodel);
             createFileFromUrl(onnxmodel, onnxmodel, () =>{
                 let url = 'labels1000.txt';
                 let request = new XMLHttpRequest();
@@ -139,7 +139,7 @@
             });
     };
 
-    function chooseBackend(){
+    function getBackend(){
         console.log('choose backend')
         let backend = document.getElementById("backend").value;
 
