@@ -16,100 +16,132 @@
 <body>
 
     <h2>Image Classification</h2>
-    <p id="status"Opencv.js is loading...></p>
+    <p id="status">Opencv.js is loading...</p>
 
     <div>
-        <div class="inputoutput">
-            <img id="imgsrc" width="224" height="224" alt="No image" />
-            <div class="caption">test image <input type="file" id="fileinput" name="file" /> </div>
-        </div>
-        <div class="inputoutput">
-            <canvas id="canvasoutput"></canvas>
-            <div calss="caption">canvasoutput</div>
-        </div>
+        <p>Model</p>
+        <select id='modelName'>
+            <option>mobilnetv2-1.0</option>
+            <option>resnet50v1</option>
+            <option>resnet50v2</option>
+            <option>squeezenet1.1</option>
+        </select>
     </div>
-    <script src="opencv.js"  type="text/javascript"></script>
+
+    <div>
+        <p>Iterations</p>
+        <input type='number' id='iterations' min='1' size='4' value='10'>
+    </div>
+
+    <div>
+        <p>Backend</p>
+        <select id='backend'>
+            <option>WASM</option>
+            <option>Threads</option>
+            <option>SIMD</option>
+            <option>Thread+SIMD</option>
+        </select>
+    </div>
+
+    <div class="inputoutput">
+        <img id="imgsrc" width="224" height="224" alt="No image" src='./image/panda.jpg' />
+        <div class="caption">test image <input type="file" id="fileinput" name="file" /> </div>
+    </div>
+
+    <button type="button" id="runButton">run</button>
+
+    <P style="visibility: hidden" id="result"></P>
+
+    <script src="./wasm/opencv.js"  type="text/javascript"></script>
 
     <script type="text/javascript">
-    cv.onRuntimeInitialized = () => {
+    let runButton = document.getElementById("runButton")
+    runButton.addEventListener("click", run)
+
+
+    function run(){
         console.log("opencv.js loaded");
+        opencvready();
         let imgelement = document.getElementById("imgsrc");
         let inputelement = document.getElementById("fileinput");
         inputelement.addEventListener("change", (e) =>{
             imgelement.src = URL.createObjectURL(e.target.files[0]);
         }, false)
+        let iterations = Number(document.querySelector('#iterations').value);
+        let backend = document.getElementById("backend").value;
+        let model = document.getElementById("modelName").value;
 
         let net;
         let keywords;
 
-        function opencvready(){
-            document.getElementById("status").innerHTML = "opencv.js is ready."
+
+        let mat = cv.imread("imgsrc");
+        let matC3 = new cv.Mat(mat.matSize[0],mat.matSize[1],cv.CV_8UC3);
+        cv.cvtColor(mat, matC3, cv.COLOR_RGBA2RGB);
+
+        let matdata = matC3.data
+        let stddata = []
+
+        for(var i=0; i<mat.matSize[0]*mat.matSize[1]; ++i){
+            stddata.push( (matdata[3*i]/255-0.485)/0.229 ); 
+            stddata.push( (matdata[3*i+1]/255-0.456)/0.224 ); 
+            stddata.push( (matdata[3*i+2]/255-0.406)/0.225 );
         }
 
-        imgelement.onload = async function(){
-                let mat = cv.imread("imgsrc");
-                cv.imshow("canvasoutput", mat);
-                let matC3 = new cv.Mat(mat.matSize[0],mat.matSize[1],cv.CV_8UC3);
-                cv.cvtColor(mat, matC3, cv.COLOR_RGBA2RGB);
+        // let normdata = []
+        // for(var k=0; k<mat.matSize[0]*mat.matSize[1]; ++k){
+        //     for(var j=0; j<3; ++j){
+        //         normdata.push(stddata[j*mat.matSize[0]*mat.matSize[1]+k])
+        //     }
+        // }
 
-                let matdata = matC3.data
-                let stddata = []
+        let newMat = cv.matFromArray(mat.matSize[0],mat.matSize[1],cv.CV_32FC3,stddata)
 
-                for(var i=0; i<mat.matSize[0]*mat.matSize[1]; ++i){
-                    stddata.push( (matdata[3*i]/255-0.485)/0.229 ); 
-                    stddata.push( (matdata[3*i+1]/255-0.456)/0.224 ); 
-                    stddata.push( (matdata[3*i+2]/255-0.406)/0.225 );
-                }
+        // cv.cvtColor(newMat, newMat, cv.COLOR_BGR2RGB)
 
-                // let normdata = []
-                // for(var k=0; k<mat.matSize[0]*mat.matSize[1]; ++k){
-                //     for(var j=0; j<3; ++j){
-                //         normdata.push(stddata[j*mat.matSize[0]*mat.matSize[1]+k])
-                //     }
-                // }
+        console.log('load model...')
+        let onnxmodel = 'squeezenet1.1.onnx';
+            createFileFromUrl(onnxmodel, onnxmodel, () =>{
+                let url = 'labels1000.txt';
+                let request = new XMLHttpRequest();
+                request.open('GET', url, true);
+                request.onload = function(ev) {
+                    if (request.readyState ===4 ) {
+                        if(request.status === 200) {
+                        keywords = request.response;
+                        keywords = keywords.split('\n')
+                            net = cv.readNetFromONNX(onnxmodel);
+                            // if (net.empty()) {
+                            //     throw Error('failed to read net')
+                            // }
+                            console.log('start inference...')
+                            let input = cv.blobFromImage(newMat, 1, new cv.Size(224, 224), new cv.Scalar(0,0,0));
+                            net.setInput(input);
+                            
+                            let timeSum = [];
+                            let topNum = 5;
+                            for(let i = 0; i<iterations+1; ++i){
+                                let start = Date.now();
+                                var result = net.forward();
+                                let end = Date.now();
 
-                let newMat = cv.matFromArray(mat.matSize[0],mat.matSize[1],cv.CV_32FC3,stddata)
-
-                // cv.cvtColor(newMat, newMat, cv.COLOR_BGR2RGB)
-
-                console.log('load model...')
-                let onnxmodel = 'squeezenet1.1.onnx';
-                    createFileFromUrl(onnxmodel, onnxmodel, () =>{
-                        let url = 'labels1000.txt';
-                        let request = new XMLHttpRequest();
-                        request.open('GET', url, true);
-                        request.onload = function(ev) {
-                            if (request.readyState ===4 ) {
-                                if(request.status === 200) {
-                                    keywords = request.response;
-                                    keywords = keywords.split('\n')
-                                    setTimeout(() => {
-                                        net = cv.readNetFromONNX(onnxmodel);
-                                        // if (net.empty()) {
-                                        //     throw Error('failed to read net')
-                                        // }
-                                        console.log('start inference...')
-                                        let input = cv.blobFromImage(newMat, 1, new cv.Size(224, 224), new cv.Scalar(0,0,0));
-                                        net.setInput(input);
-
-                                        let start = Date.now();
-                                        var result = net.forward();
-                                        let end = Date.now()
-
-                                        let classes = getTopClasses(result, keywords, 5)
-                                        console.log(classes)
-                                        let delta = end - start
-                                        console.log('inference time: ' + delta + 'ms' )
-                                    })
-                                }
-                            }
+                                let classes = getTopClasses(result, keywords, topNum);
+                                let delta = end - start;
+                                console.log(`Iterations: ${i+1} / ${iterations+1}, inference time: ${delta}ms`);
+                                printResult(classes, topNum);
+                                timeSum.push(delta);                                
+                            };
+                            let finalResult = summarize(timeSum);
+                            console.log('Test finished!');
+                            document.getElementById("result").style.visibility="visible";
+                            document.getElementById("result").innerHTML=`Inference Time: ${finalResult.mean.toFixed(2)}+-${finalResult.std.toFixed(2)} [ms]`;
                         };
-                        request.send();
-                    });
-        };
+                    };
+                };
+                request.send();
+            });
+    };
 
-    
-}
 
     function createFileFromUrl(path, url, callback){
         let request = new XMLHttpRequest();
@@ -160,6 +192,40 @@
         }
         return classes;
     }
+
+    function printResult(classes, topNum){
+        for (let i = 0; i < topNum; ++i){
+            console.log(`label: ${classes[i].label}, probability: ${classes[i].prob}%`)
+        }
+    }
+
+    function summarize(results) {
+        if (results.length !== 0) {
+            // remove first run, which is regarded as "warming up" execution
+            results.shift();
+            let d = results.reduce((d, v) => {
+                d.sum += v;
+                d.sum2 += v * v;
+                return d;
+            }, {
+                sum: 0,
+                sum2: 0
+            });
+            let mean = d.sum / results.length;
+            let std = Math.sqrt((d.sum2 - results.length * mean * mean) / (results.length - 1));
+            return {
+                mean: mean,
+                std: std
+            };
+        } else {
+            return null;
+        }
+    }
+
+    function opencvready(){
+            document.getElementById("status").innerHTML = "opencv.js is ready."
+    }
+
     </script>
 
 </body>
