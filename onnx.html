@@ -30,16 +30,16 @@
 
     <div>
         <p>Iterations</p>
-        <input type='number' id='iterations' min='1' size='4' value='10'>
+        <input type='number' id='iterations' min='1' size='4' value='200'>
     </div>
 
     <div>
         <p>Backend</p>
         <select id='backend'>
-            <option>SIMD</option>
-            <option>Threads+SIMD</option>            
-            <option>Threads</option>
             <option>WASM</option>
+            <option>Threads</option>
+            <option>SIMD</option>
+            <option>Threads+SIMD</option>          
         </select>
     </div>
 
@@ -99,7 +99,6 @@
 
         console.log('load model...')
         let onnxmodel = document.getElementById("modelName").value + '.onnx';
-        console.log(onnxmodel);
             createFileFromUrl(onnxmodel, onnxmodel, () =>{
                 let url = 'labels1000.txt';
                 let request = new XMLHttpRequest();
@@ -110,9 +109,6 @@
                         keywords = request.response;
                         keywords = keywords.split('\n')
                             net = cv.readNetFromONNX(onnxmodel);
-                            // if (net.empty()) {
-                            //     throw Error('failed to read net')
-                            // }
                             console.log('start inference...')
                             let input = cv.blobFromImage(newMat, 1, new cv.Size(224, 224), new cv.Scalar(0,0,0));
                             net.setInput(input);
@@ -133,7 +129,9 @@
                             let finalResult = summarize(timeSum);
                             console.log('Test finished!');
                             document.getElementById("result").style.visibility="visible";
-                            document.getElementById("result").innerHTML=`Inference Time: ${finalResult.mean.toFixed(2)}+-${finalResult.std.toFixed(2)} [ms]`;
+                            document.getElementById("result").innerHTML=`Backend: ${document.getElementById("backend").value} <br>
+                                                                         Model: ${document.getElementById("modelName").value} <br>
+                                                                         Inference Time: ${finalResult.mean.toFixed(2)} ± ${finalResult.std.toFixed(2)} [ms]`;
                         };
                     };
                 };
@@ -142,14 +140,11 @@
     };
 
     function getBackend(){
-        console.log('choose backend')
         let backend = document.getElementById("backend").value;
 
         var head = document.getElementsByTagName('head')[0];
         if(document.getElementById("backendScript")!=null){
             console.log('delete backend')
-            //window.location.reload();
-            //head.removeChild(document.getElementById("backendScript"));
             delete window.cv;
         };
 
