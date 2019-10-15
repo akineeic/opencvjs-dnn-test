@@ -21,10 +21,10 @@
     <div>
         <p>Model</p>
         <select id='modelName'>
+            <option>squeezenet</option>
             <option>mobilenetv2</option>
             <option>resnet50v1</option>
             <option>resnet50v2</option>
-            <option>squeezenet</option>
         </select>
     </div>
 
@@ -36,10 +36,10 @@
     <div>
         <p>Backend</p>
         <select id='backend'>
-            <option>WASM</option>
-            <option>Threads</option>
             <option>SIMD</option>
-            <option>Thread+SIMD</option>
+            <option>Threads+SIMD</option>            
+            <option>Threads</option>
+            <option>WASM</option>
         </select>
     </div>
 
