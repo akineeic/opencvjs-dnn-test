@@ -1,6 +1,8 @@
 let calIterations = document.getElementById("calIterations");
 let testInfo = document.getElementById("testInfo");
 let iterationProgress = document.getElementById("iterationProgress");
+let modelLoad = document.getElementById("modelLoad");
+let modelProgress = document.getElementById("modelProgress");
 
 let runButton = document.getElementById("runButton")
 runButton.addEventListener("click", run)
@@ -14,8 +16,7 @@ inputelement.addEventListener("change", (e) =>{
 let modelState = ['squeezenet', 'mobilenetv2', 'resnet50v1', 'resnet50v2']
 
 function run(){
-    calIterations.innerHTML = '';
-    testInfo.innerHTML = '';
+    clearResult();
     console.log('load model...')
     let onnxmodel = document.getElementById("modelName").value;
     index = modelState.indexOf(onnxmodel);
@@ -48,18 +49,25 @@ function excute(){
 
 async function compute (keywords){
     let inputMat = imageToMat();
-    let iterations = Number(document.querySelector('#iterations').value);
     let onnxmodel = document.getElementById("modelName").value + '.onnx';
     let net = cv.readNetFromONNX(onnxmodel);
     console.log('Start inference...')
     let input = cv.blobFromImage(inputMat, 1, new cv.Size(224, 224), new cv.Scalar(0,0,0));
     net.setInput(input);
     
-    let timeSum = [];
-    let topNum = 5;
-    let classes = [];
+    let result =await mulForward(net, keywords);
+    timeSum = result.timeSum;
+    classes = result.classes;
 
-    for(let i = 0; i<iterations+1; ++i){
+    updateResult(timeSum, classes);
+}
+
+async function mulForward(net, keywords){
+    let iterations = Number(document.querySelector('#iterations').value);
+    let topNum = 5;
+    let timeSum = [];
+
+    for(var i = 0; i<iterations+1; ++i){
         let start = performance.now();
         let result = net.forward();
         let end = performance.now();
@@ -67,28 +75,14 @@ async function compute (keywords){
         classes = getTopClasses(result, keywords, topNum);
         let delta = end - start;
         console.log(`Iterations: ${i+1} / ${iterations+1}, inference time: ${delta}ms`);
-        await showProgress(i, iterations);
         printResult(classes, topNum);
         timeSum.push(delta);                                
     };
-    calIterations.style.visibility="visible";
-    calIterations.innerHTML = `Test finished!`;
-    let finalResult = summarize(timeSum);
-    console.log('Test finished!');
-    testInfo.style.visibility="visible";
-    testInfo.innerHTML = `<b>Build optimization</b>: ${document.getElementById("title").innerHTML.split(/[()]/)[1]} <br>
-                                                    <b>Model</b>: ${document.getElementById("modelName").value} <br>
-                                                    <b>Inference Time</b>: ${finalResult.mean.toFixed(2)}`;
-    if(iterations != 1){
-        testInfo.innerHTML += `± ${finalResult.std.toFixed(2)} [ms] <br> <br>`;
-    } else{
-        testInfo.innerHTML += `[ms] <br> <br>`;
-    };
-    testInfo.innerHTML += `<b>label1</b>: ${classes[0].label}, probability: ${classes[0].prob}% <br>
-                            <b>label2</b>: ${classes[1].label}, probability: ${classes[1].prob}% <br>
-                            <b>label3</b>: ${classes[2].label}, probability: ${classes[2].prob}% <br>
-                            <b>label4</b>: ${classes[3].label}, probability: ${classes[3].prob}% <br>
-                            <b>label5</b>: ${classes[4].label}, probability: ${classes[4].prob}%` ;
+
+    return{
+        timeSum: timeSum,
+        classes: classes
+    }
 }
 
 function imageToMat(){
@@ -107,8 +101,36 @@ function imageToMat(){
     return inputMat;
 }
 
-async function showProgress(i, iterations) {
+function showProgress(i, iterations) {
     iterationProgress.value = (i+1)*100/(iterations+1);
+}
+
+function updateResult(timeSum, classes){
+    calIterations.style.visibility="visible";
+    calIterations.innerHTML = `Test finished!`;
+    let finalResult = summarize(timeSum);
+    console.log('Test finished!');
+    testInfo.style.visibility="visible";
+    testInfo.innerHTML = `<b>Build optimization</b>: ${document.getElementById("title").innerHTML.split(/[()]/)[1]} <br>
+                                                    <b>Model</b>: ${document.getElementById("modelName").value} <br>
+                                                    <b>Inference Time</b>: ${finalResult.mean.toFixed(2)}`;
+    if(iterations != 1){
+        testInfo.innerHTML += `± ${finalResult.std.toFixed(2)} [ms] <br> <br>`;
+    } else{
+        testInfo.innerHTML += `[ms] <br> <br>`;
+    };
+    testInfo.innerHTML += `<b>label1</b>: ${classes[0].label}, probability: ${classes[0].prob}% <br>
+                           <b>label2</b>: ${classes[1].label}, probability: ${classes[1].prob}% <br>
+                           <b>label3</b>: ${classes[2].label}, probability: ${classes[2].prob}% <br>
+                           <b>label4</b>: ${classes[3].label}, probability: ${classes[3].prob}% <br>
+                           <b>label5</b>: ${classes[4].label}, probability: ${classes[4].prob}%` ;
+}
+
+function clearResult(){
+    calIterations.innerHTML = '';
+    testInfo.innerHTML = '';
+    modelLoad.innerHTML = '';
+    modelProgress.value = 0;
 }
 
 function createFileFromUrl(path, url, callback){
@@ -127,7 +149,16 @@ function createFileFromUrl(path, url, callback){
         }
     };
     request.send();
+    request.onprogress = updateProgress;
 };
+
+function updateProgress(ev){
+    let totalSize = ev.total / (1000 * 1000);
+    let loadedSize = ev.loaded / (1000 * 1000);
+    let percentComplete = ev.loaded / ev.total * 100;
+    modelLoad.innerHTML = `${loadedSize.toFixed(2)}/${totalSize.toFixed(2)}MB ${percentComplete.toFixed(2)}%`;
+    modelProgress.value = percentComplete;
+}
 
 function softmax(arr) {
     const C = Math.max(...arr);
