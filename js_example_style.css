@@ -1,5 +1,9 @@
-body, div, p {
+body, div{
     font: 400 14px/22px Roboto,sans-serif;
+    margin-top: 10px
+}
+p {
+    margin-bottom: 0px;
 }
 canvas, img, video {
     border: 1px solid black;
