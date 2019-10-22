@@ -1,6 +1,6 @@
-let calIterations = document.getElementById("calIterations");
 let testInfo = document.getElementById("testInfo");
 let iterationProgress = document.getElementById("iterationProgress");
+let showIterations = document.getElementById("showIterations");
 let modelLoad = document.getElementById("modelLoad");
 let modelProgress = document.getElementById("modelProgress");
 
@@ -13,75 +13,71 @@ inputelement.addEventListener("change", (e) =>{
     imgelement.src = URL.createObjectURL(e.target.files[0]);
 }, false)
 
-let modelState = ['squeezenet', 'mobilenetv2', 'resnet50v1', 'resnet50v2']
+let modelStatus = ['squeezenet', 'mobilenetv2', 'resnet50v1', 'resnet50v2'];
+let iterations = Number(document.querySelector('#iterations').value);
+let initFlag = true, calIteration = 0, topNum = 5, timeSum = [], labels, classes;
 
 function run(){
-    clearResult();
+    initPara();
     console.log('load model...')
     let onnxmodel = document.getElementById("modelName").value;
-    index = modelState.indexOf(onnxmodel);
+    index = modelStatus.indexOf(onnxmodel);
     if ( index != -1){
         onnxmodel += '.onnx';
-        createFileFromUrl(onnxmodel, onnxmodel, excute);
-        modelState.splice(index, 1);
+        createFileFromUrl(onnxmodel, onnxmodel, compute);
+        modelStatus.splice(index, 1);
     } else{
-        excute();
+        modelLoad.innerHTML = `${onnxmodel} has been loaded before.`
+        compute();
     };
-    
 }
 
-function excute(){
+function loadLables(){
     let url = 'labels1000.txt';
     let request = new XMLHttpRequest();
     request.open('GET', url, true);
     request.onload = function(ev) {
         if (request.readyState ===4 ) {
             if(request.status === 200) {
-                let keywords = request.response;
-                keywords = keywords.split('\n')
-                iterationProgress.style.visibility="visible";
-                compute(keywords);
+                labels = request.response;
+                labels = labels.split('\n')
             };
         };
     };
     request.send();
 };
 
-async function compute (keywords){
+function compute (){
     let inputMat = imageToMat();
     let onnxmodel = document.getElementById("modelName").value + '.onnx';
     let net = cv.readNetFromONNX(onnxmodel);
     console.log('Start inference...')
     let input = cv.blobFromImage(inputMat, 1, new cv.Size(224, 224), new cv.Scalar(0,0,0));
     net.setInput(input);
-    
-    let result =await mulForward(net, keywords);
-    timeSum = result.timeSum;
-    classes = result.classes;
 
-    updateResult(timeSum, classes);
+    eachForward(net);
 }
 
-async function mulForward(net, keywords){
-    let iterations = Number(document.querySelector('#iterations').value);
-    let topNum = 5;
-    let timeSum = [];
+function eachForward(net){
+    let start = performance.now();
+    let result = net.forward();
+    let end = performance.now();
 
-    for(var i = 0; i<iterations+1; ++i){
-        let start = performance.now();
-        let result = net.forward();
-        let end = performance.now();
+    classes = getTopClasses(result);
+    let delta = end - start;
+    console.log(`Iterations: ${calIteration+1} / ${iterations+1}, inference time: ${delta}ms`);
+    printResult(classes);
+    timeSum.push(delta);   
+    iterationState();
+    ++calIteration;
 
-        classes = getTopClasses(result, keywords, topNum);
-        let delta = end - start;
-        console.log(`Iterations: ${i+1} / ${iterations+1}, inference time: ${delta}ms`);
-        printResult(classes, topNum);
-        timeSum.push(delta);                                
-    };
-
-    return{
-        timeSum: timeSum,
-        classes: classes
+    if(calIteration<iterations+1){
+        setTimeout(function(){
+            eachForward(net);
+        }, 0);
+    } else{
+        console.log('Test finished!');
+        updateResult(classes);
     }
 }
 
@@ -101,23 +97,22 @@ function imageToMat(){
     return inputMat;
 }
 
-function showProgress(i, iterations) {
-    iterationProgress.value = (i+1)*100/(iterations+1);
+function iterationState() {
+    iterationProgress.style.visibility = 'visible';
+    iterationProgress.value = (calIteration+1)*100/(iterations+1);
+    showIterations.innerHTML = `Iterations: ${calIteration+1} / ${iterations+1}`;
 }
 
-function updateResult(timeSum, classes){
-    calIterations.style.visibility="visible";
-    calIterations.innerHTML = `Test finished!`;
+function updateResult(classes){
     let finalResult = summarize(timeSum);
-    console.log('Test finished!');
     testInfo.style.visibility="visible";
-    testInfo.innerHTML = `<b>Build optimization</b>: ${document.getElementById("title").innerHTML.split(/[()]/)[1]} <br>
+    testInfo.innerHTML = `<b>Build type</b>: ${document.getElementById("title").innerHTML.split(/[()]/)[1]} <br>
                                                     <b>Model</b>: ${document.getElementById("modelName").value} <br>
                                                     <b>Inference Time</b>: ${finalResult.mean.toFixed(2)}`;
     if(iterations != 1){
-        testInfo.innerHTML += `± ${finalResult.std.toFixed(2)} [ms] <br> <br>`;
+        testInfo.innerHTML += ` ± ${finalResult.std.toFixed(2)} [ms] <br> <br>`;
     } else{
-        testInfo.innerHTML += `[ms] <br> <br>`;
+        testInfo.innerHTML += ` [ms] <br> <br>`;
     };
     testInfo.innerHTML += `<b>label1</b>: ${classes[0].label}, probability: ${classes[0].prob}% <br>
                            <b>label2</b>: ${classes[1].label}, probability: ${classes[1].prob}% <br>
@@ -126,11 +121,22 @@ function updateResult(timeSum, classes){
                            <b>label5</b>: ${classes[4].label}, probability: ${classes[4].prob}%` ;
 }
 
-function clearResult(){
-    calIterations.innerHTML = '';
+function initPara(){
+    iterations = Number(document.querySelector('#iterations').value);
+    calIteration = 0;
+    timeSum = [];
+
     testInfo.innerHTML = '';
     modelLoad.innerHTML = '';
     modelProgress.value = 0;
+    modelProgress.style.visibility = 'hidden';
+    iterationProgress.style.visibility = 'hidden';
+    showIterations.innerHTML = '';
+
+    if(initFlag){
+        loadLables();
+        initFlag = false;
+    };
 }
 
 function createFileFromUrl(path, url, callback){
@@ -149,10 +155,11 @@ function createFileFromUrl(path, url, callback){
         }
     };
     request.send();
-    request.onprogress = updateProgress;
+    request.onprogress = modelState;
 };
 
-function updateProgress(ev){
+function modelState(ev){
+    modelProgress.style.visibility = 'visible';
     let totalSize = ev.total / (1000 * 1000);
     let loadedSize = ev.loaded / (1000 * 1000);
     let percentComplete = ev.loaded / ev.total * 100;
@@ -169,7 +176,7 @@ function softmax(arr) {
 }
 
 
-function getTopClasses(mat, labels, k = 5) {
+function getTopClasses(mat) {
     let initdata = mat.data32F;
     initdata = softmax(initdata);
     let probs = Array.from(initdata);
@@ -180,7 +187,7 @@ function getTopClasses(mat, labels, k = 5) {
     });
     sorted.reverse();
     let classes = [];
-    for (let i = 0; i < k; ++i) {
+    for (let i = 0; i < topNum; ++i) {
     let prob = sorted[i][0];
     let index = sorted[i][1];
     let c = {
@@ -192,7 +199,7 @@ function getTopClasses(mat, labels, k = 5) {
     return classes;
 }
 
-function printResult(classes, topNum){
+function printResult(classes){
     for (let i = 0; i < topNum; ++i){
         console.log(`label: ${classes[i].label}, probability: ${classes[i].prob}%`)
     }
