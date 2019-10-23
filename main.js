@@ -3,35 +3,75 @@ let iterationProgress = document.getElementById("iterationProgress");
 let showIterations = document.getElementById("showIterations");
 let modelLoad = document.getElementById("modelLoad");
 let modelProgress = document.getElementById("modelProgress");
+let showModel = document.getElementById("showModel");
 
-let runButton = document.getElementById("runButton")
-runButton.addEventListener("click", run)
+let runButton = document.getElementById("runButton");
+runButton.addEventListener("click", run);
 
 let imgelement = document.getElementById("imgsrc");
 let inputelement = document.getElementById("fileinput");
 inputelement.addEventListener("change", (e) =>{
     imgelement.src = URL.createObjectURL(e.target.files[0]);
-}, false)
+}, false);
 
+
+/*************************   CONTROL PARAMETERS   **************************/
+
+// Record if the model have been loaded
 let modelStatus = ['squeezenet', 'mobilenetv2', 'resnet50v1', 'resnet50v2'];
+// The forward iterations
 let iterations = Number(document.querySelector('#iterations').value);
-let initFlag = true, calIteration = 0, topNum = 5, timeSum = [], labels, classes;
+// Flag for first run
+let initFlag = true;
+// count for iterations
+let calIteration = 0;
+// Number of top result to show
+let topNum = 5;
+// Save each forward time 
+let timeSum = [];
+// Lables for image classification
+let labels;
+// Top result to show
+let classes;
 
+//Detect the click, init the UI and control parameters,
+//check if the model have been loaded, then run the test.
 function run(){
     initPara();
-    console.log('load model...')
     let onnxmodel = document.getElementById("modelName").value;
     index = modelStatus.indexOf(onnxmodel);
     if ( index != -1){
         onnxmodel += '.onnx';
+        showModel.innerHTML = 'Model loading...';
         createFileFromUrl(onnxmodel, onnxmodel, compute);
         modelStatus.splice(index, 1);
     } else{
-        modelLoad.innerHTML = `${onnxmodel} has been loaded before.`
+        modelLoad.innerHTML = `${onnxmodel} has been loaded before.`;
         compute();
     };
 }
 
+//Init the UI and the control parameters.
+function initPara(){
+    iterations = Number(document.querySelector('#iterations').value);
+    calIteration = 0;
+    timeSum = [];
+
+    testInfo.innerHTML = '';
+    modelLoad.innerHTML = '';
+    showModel.innerHTML = '';
+    modelProgress.value = 0;
+    modelProgress.style.visibility = 'hidden';
+    iterationProgress.style.visibility = 'hidden';
+    showIterations.innerHTML = '';
+
+    if(initFlag){
+        loadLables();
+        initFlag = false;
+    };
+}
+
+//Load labels from the txt for the first run.
 function loadLables(){
     let url = 'labels1000.txt';
     let request = new XMLHttpRequest();
@@ -47,6 +87,7 @@ function loadLables(){
     request.send();
 };
 
+//The whole compute pipeline.
 function compute (){
     let inputMat = imageToMat();
     let onnxmodel = document.getElementById("modelName").value + '.onnx';
@@ -58,6 +99,7 @@ function compute (){
     eachForward(net);
 }
 
+//Excute forward function one by one, update the UI during each forward.
 function eachForward(net){
     let start = performance.now();
     let result = net.forward();
@@ -78,9 +120,10 @@ function eachForward(net){
     } else{
         console.log('Test finished!');
         updateResult(classes);
-    }
+    };
 }
 
+//Read the image from webpage, do the image processing.
 function imageToMat(){
     let mat = cv.imread("imgsrc");
     let matC3 = new cv.Mat(mat.matSize[0],mat.matSize[1],cv.CV_8UC3);
@@ -97,12 +140,14 @@ function imageToMat(){
     return inputMat;
 }
 
+//Update the iteration UI during the compute process.
 function iterationState() {
     iterationProgress.style.visibility = 'visible';
     iterationProgress.value = (calIteration+1)*100/(iterations+1);
     showIterations.innerHTML = `Iterations: ${calIteration+1} / ${iterations+1}`;
 }
 
+//Show the final result in the webpage.
 function updateResult(classes){
     let finalResult = summarize(timeSum);
     testInfo.style.visibility="visible";
@@ -121,24 +166,7 @@ function updateResult(classes){
                            <b>label5</b>: ${classes[4].label}, probability: ${classes[4].prob}%` ;
 }
 
-function initPara(){
-    iterations = Number(document.querySelector('#iterations').value);
-    calIteration = 0;
-    timeSum = [];
-
-    testInfo.innerHTML = '';
-    modelLoad.innerHTML = '';
-    modelProgress.value = 0;
-    modelProgress.style.visibility = 'hidden';
-    iterationProgress.style.visibility = 'hidden';
-    showIterations.innerHTML = '';
-
-    if(initFlag){
-        loadLables();
-        initFlag = false;
-    };
-}
-
+//Load the file from the filesystem.
 function createFileFromUrl(path, url, callback){
     let request = new XMLHttpRequest();
     request.open('GET', url, true);
@@ -148,6 +176,7 @@ function createFileFromUrl(path, url, callback){
             if (request.status === 200) {
                 let data = new Uint8Array(request.response);
                 cv.FS_createDataFile('/', path, data, true, false, false);
+                showModel.innerHTML = 'Model loaded.';
                 callback();
             } else {
                 console.log('Failed to load ' + url + ' status: ' + request.status);
@@ -158,6 +187,7 @@ function createFileFromUrl(path, url, callback){
     request.onprogress = modelState;
 };
 
+//Show the model status when load the model.
 function modelState(ev){
     modelProgress.style.visibility = 'visible';
     let totalSize = ev.total / (1000 * 1000);
@@ -167,6 +197,7 @@ function modelState(ev){
     modelProgress.value = percentComplete;
 }
 
+//Add softmax layer to gengerate the probility.
 function softmax(arr) {
     const C = Math.max(...arr);
     const d = arr.map((y) => Math.exp(y - C)).reduce((a, b) => a + b);
@@ -175,7 +206,7 @@ function softmax(arr) {
     })
 }
 
-
+//Find the top num labels from the forward result.
 function getTopClasses(mat) {
     let initdata = mat.data32F;
     initdata = softmax(initdata);
@@ -199,12 +230,14 @@ function getTopClasses(mat) {
     return classes;
 }
 
+//Print each inference result in the console.
 function printResult(classes){
     for (let i = 0; i < topNum; ++i){
         console.log(`label: ${classes[i].label}, probability: ${classes[i].prob}%`)
     }
 }
 
+//Generate the summarize result from the collect time.
 function summarize(results) {
     if (results.length !== 0) {
         // remove first run, which is regarded as "warming up" execution
@@ -225,5 +258,5 @@ function summarize(results) {
         };
     } else {
         return null;
-    }
+    };
 }
