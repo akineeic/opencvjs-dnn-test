@@ -120,6 +120,8 @@ function eachForward(net){
     } else{
         console.log('Test finished!');
         updateResult(classes);
+        net.delete();
+        result.delete();
     };
 }
 
@@ -144,7 +146,7 @@ function imageToMat(){
 function iterationState() {
     iterationProgress.style.visibility = 'visible';
     iterationProgress.value = (calIteration+1)*100/(iterations+1);
-    showIterations.innerHTML = `Iterations: ${calIteration+1} / ${iterations+1}`;
+    showIterations.innerHTML = `Iterations: ${calIteration} / ${iterations}`;
 }
 
 //Show the final result in the webpage.
