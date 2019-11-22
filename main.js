@@ -7,6 +7,9 @@ let showModel = document.getElementById("showModel");
 
 let runButton = document.getElementById("runButton");
 runButton.addEventListener("click", run);
+cv.onRuntimeInitialized = () => {
+    runButton.disabled = false;
+}
 
 let imgelement = document.getElementById("imgsrc");
 let inputelement = document.getElementById("fileinput");
@@ -145,7 +148,7 @@ function imageToMat(){
 //Update the iteration UI during the compute process.
 function iterationState() {
     iterationProgress.style.visibility = 'visible';
-    iterationProgress.value = (calIteration+1)*100/(iterations+1);
+    iterationProgress.value = (calIteration)*100/(iterations);
     showIterations.innerHTML = `Iterations: ${calIteration} / ${iterations}`;
 }
 
