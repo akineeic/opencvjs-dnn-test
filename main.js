@@ -7,6 +7,7 @@ let showModel = document.getElementById("showModel");
 
 let runButton = document.getElementById("runButton");
 runButton.addEventListener("click", run);
+// Run test only after opencv.js loaded
 cv.onRuntimeInitialized = () => {
     runButton.disabled = false;
 }
@@ -22,17 +23,17 @@ inputelement.addEventListener("change", (e) =>{
 
 // Record if the model have been loaded
 let modelStatus = ['squeezenet', 'mobilenetv2', 'resnet50v1', 'resnet50v2'];
-// The forward iterations
+// The forward iterations set by user
 let iterations = Number(document.querySelector('#iterations').value);
 // Flag for first run
 let initFlag = true;
-// count for iterations
+// Count for iterations finished
 let calIteration = 0;
 // Number of top result to show
 let topNum = 5;
 // Save each forward time 
 let timeSum = [];
-// Lables for image classification
+// Lables for image classification result
 let labels;
 // Top result to show
 let classes;
@@ -42,11 +43,11 @@ let classes;
 function run(){
     initPara();
     let onnxmodel = document.getElementById("modelName").value;
-    index = modelStatus.indexOf(onnxmodel);
+    let index = modelStatus.indexOf(onnxmodel);
     if ( index != -1){
         onnxmodel += '.onnx';
         showModel.innerHTML = 'Model loading...';
-        createFileFromUrl(onnxmodel, onnxmodel, compute);
+        createFileFromUrl(onnxmodel, onnxmodel, compute, modelState);
         modelStatus.splice(index, 1);
     } else{
         modelLoad.innerHTML = `${onnxmodel} has been loaded before.`;
@@ -88,7 +89,7 @@ function loadLables(){
         };
     };
     request.send();
-};
+}
 
 //The whole compute pipeline.
 function compute (){
@@ -172,7 +173,7 @@ function updateResult(classes){
 }
 
 //Load the file from the filesystem.
-function createFileFromUrl(path, url, callback){
+function createFileFromUrl(path, url, callback, onprogress){
     let request = new XMLHttpRequest();
     request.open('GET', url, true);
     request.responseType = 'arraybuffer';
@@ -189,7 +190,7 @@ function createFileFromUrl(path, url, callback){
         }
     };
     request.send();
-    request.onprogress = modelState;
+    request.onprogress = onprogress;
 };
 
 //Show the model status when load the model.
