@@ -18,6 +18,12 @@ inputelement.addEventListener("change", (e) =>{
     imgelement.src = URL.createObjectURL(e.target.files[0]);
 }, false);
 
+const modelZoo = [
+    {name: 'squeezenet', url: 'https://webnnmodel.s3-us-west-2.amazonaws.com/image_classification/model/squeezenet1.1.onnx'},
+    {name: 'mobilenetv2', url: 'https://webnnmodel.s3-us-west-2.amazonaws.com/image_classification/model/mobilenetv2-1.0.onnx'},
+    {name: 'resnet50v1', url: 'https://webnnmodel.s3-us-west-2.amazonaws.com/image_classification/model/resnet50v1.onnx'},
+    {name: 'resnet50v2', url: 'https://webnnmodel.s3-us-west-2.amazonaws.com/image_classification/model/resnet50v2.onnx'}
+];
 
 /*************************   CONTROL PARAMETERS   **************************/
 
@@ -45,6 +51,8 @@ function run(){
     let onnxmodel = document.getElementById("modelName").value;
     let index = modelStatus.indexOf(onnxmodel);
     if ( index != -1){
+        modelInfo = getModelById(onnxmodel);
+        modelUrl = modelInfo.url;
         onnxmodel += '.onnx';
         showModel.innerHTML = 'Model loading...';
         createFileFromUrl(onnxmodel, onnxmodel, compute, modelState);
@@ -53,6 +61,15 @@ function run(){
         modelLoad.innerHTML = `${onnxmodel} has been loaded before.`;
         compute();
     };
+}
+
+function getModelById(id){
+    for(const modelInfo of modelZoo){
+        if (id === modelInfo.name) {
+            return modelInfo;
+        };
+    };
+    return {};
 }
 
 //Init the UI and the control parameters.
@@ -104,9 +121,9 @@ function compute (){
 }
 
 //Excute forward function one by one, update the UI during each forward.
-function eachForward(net){
+async function eachForward(net){
     let start = performance.now();
-    let result = net.forward();
+    let result =await excute(net);
     let end = performance.now();
 
     classes = getTopClasses(result);
@@ -127,6 +144,12 @@ function eachForward(net){
         net.delete();
         result.delete();
     };
+}
+
+//Excute the net
+async function excute(net){
+    let result = net.forward();
+    return result;
 }
 
 //Read the image from webpage, do the image processing.
